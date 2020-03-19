@@ -1,0 +1,230 @@
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import scipy
+import cmath as c
+from scipy.sparse.linalg import lobpcg
+from scipy import sparse
+from pyamg import smoothed_aggregation_solver
+from pyamg.gallery import poisson
+
+CONST = 1.756e+18
+#N = 100	# 53,67,74,85,96,100,106,118,120,127,134 - sizes at which EF (Fermi level) = eigen energy level
+#K = 20
+#Narray = np.zeros((6))
+#Narray = np.array([53, 67, 74, 85, 97, 100, 106, 118, 120, 127, 134])	# 	 
+#Karray = np.array([1, 3, 4, 6, 8, 10, 12, 14, 16, 18, 19])				#	1or2, 3, 4or5, 6or7, 8or9, 10, 11or12, 13or14, 15or16
+Narray = np.array([53, 67, 74, 85, 97, 100])	# 	 
+Karray = np.array([2, 3, 5, 7, 9, 10])				#	1or2, 3, 4or5, 6or7, 8or9, 10, 11or12, 13or14, 15or16
+
+#pot = 10.0/57
+#E = 3.2281
+E = 0.8+0j
+VL = 0.3+0j
+VR = 0.2+0j
+VB = 2.2+0j
+h0 = 0.2+0j
+z1 = 50e-9	# left layer is 50nm long
+#d = 2e-9	# spacer layer is 2nm long
+d = np.arange(0.01,10.0,0.01)*1e-9
+z2 = z1 + d	
+
+def k(E,V,k2):
+	return np.sqrt(CONST*(E-V)-k2)
+
+def add(k,K):
+	return (k+K*1j)
+
+def R(k,K,z,sgn):
+	R = np.zeros((2,2,len(k)))*1j
+	R[0,0,:] = add(k,-K)*np.exp(sgn*z*add(K,-k))
+	R[0,1,:] = sgn*add(k,K)*np.exp(z*add(-K,-k))
+	R[1,0,:] = sgn*add(k,K)*np.exp(z*add(K,k))
+	R[1,1,:] = add(k,-K)*np.exp(z*sgn*add(-K,k))
+	return R
+
+def solve(N,K):
+	A = poisson((N,N), format='csr')
+
+	# create the AMG hierarchy
+	ml = smoothed_aggregation_solver(A)
+
+	# initial approximation to the K eigenvectors
+	X = scipy.rand(A.shape[0], K) 
+
+	# preconditioner based on ml
+	M = ml.aspreconditioner()
+
+	# compute eigenvalues and eigenvectors with LOBPCG
+	W,V = lobpcg(A, X, M=M, tol=1e-8, largest=False)
+	W*=57
+#	print W
+	return W
+
+def TMR_G(W,e,VB,h0,z1,z2):
+	#W = np.arange(0,1,0.01)
+	k2pp = CONST*W
+	#print W
+#	kL = k(E,VL,k2pp)		# wave vector in left non-magnetic layer
+	kB = (k(-E,-VB,-k2pp)).real+1	# wave vector in barrier spacer layer
+#	kR = k(E,VR,k2pp)		# wave vector in right non-magnetic layer
+	kM = (k(E,-h0,k2pp))#.real+1		# wave vector for majority spin channel
+	km = (k(E,h0,k2pp)).real+1		# wave vector for minority spin channel
+
+	gfM = d*0
+	gfm = d*0
+	gaMm = d*0
+	tmr = d*0
+#	Tplt = np.zeros((len(d),len(kM) if isinstance(kM, np.ndarray) else 1))
+#	Cplt = d*0
+	for i in range(len(d)):
+#		R1 = R(kL,kB,z1,1)/(2*kL)
+#		R2 = R(kR,kB,z2[i],-1)*1j/(2*kB)
+
+		R1M = R(kM,kB,z1,1)/(2*kM)
+		R2M = R(kM,kB,z2[i],-1)*1j/(2*kB)
+	
+		R1m = R(km,kB,z1,1)/(2*km)
+		R2m = R(km,kB,z2[i],-1)*1j/(2*kB)
+
+#		T = (kR/kL)/((abs(R1[0,0,:]*R2[0,0,:]+R1[0,1,:]*R2[1,0,:]))**2)	# transmission probability
+		TMM = (kM/kM)/((abs(R1M[0,0,:]*R2M[0,0,:]+R1M[0,1,:]*R2M[1,0,:]))**2)	# transmission probability
+		Tmm = (km/km)/((abs(R1m[0,0,:]*R2m[0,0,:]+R1m[0,1,:]*R2m[1,0,:]))**2)	# transmission probability
+		TMm = (km/kM)/((abs(R1M[0,0,:]*R2m[0,0,:]+R1M[0,1,:]*R2m[1,0,:]))**2)	# transmission probability
+	
+		dk2 = np.roll(k2pp,-1) - k2pp
+		dk2[-1] = 1.0*CONST-k2pp[-1]
+		#dk2 = 1
+#		G = np.cumsum((1.962635e-6)*dk2*np.roll(T,1))[-2]	# total conductance
+	
+#		Tplt[i,:] = dk2/np.roll((abs(R1M[0,0,:]*R2M[0,0,:]+R1M[0,1,:]*R2M[1,0,:]))**2,1)
+#		Cplt[i] = 1.962635e-6*np.cumsum(Tplt[i,:])[-2]
+
+#		gfM[i] = np.cumsum((1.962635e-6)*dk2*np.roll(TMM,1))[-2]	# conductance for ferromagnetic spin majority channel
+#		gfm[i] = np.cumsum((1.962635e-6)*dk2*np.roll(Tmm,1))[-2]	# conductance for ferromagnetic spin minority channel
+#		gaMm[i] = np.cumsum((1.962635e-6)*dk2*np.roll(TMm,1))[-2]	# conductance for anti-ferromagnetic channel
+
+		gfM[i] = np.cumsum((1.962635e-6)*dk2*TMM)[-1]	# conductance for ferromagnetic spin majority channel
+		gfm[i] = np.cumsum((1.962635e-6)*dk2*Tmm)[-1]	# conductance for ferromagnetic spin minority channel
+		gaMm[i] = np.cumsum((1.962635e-6)*dk2*TMm)[-1]	# conductance for anti-ferromagnetic channel
+
+		gf = gfM + gfm
+		ga = 2*gaMm
+
+		tmr[i] = (gf[i]-ga[i])*100/ga[i]
+	return gfM,gfm,gaMm,tmr
+
+#GFM = np.zeros((len(W),len(d)))
+#GFm = np.zeros((len(W),len(d)))
+#GAMm = np.zeros((len(W),len(d)))
+#TMR = np.zeros((len(W),len(d)))
+GFM = d*0
+GFm = d*0
+GAMm = d*0
+TMR = d*0
+
+#for i in range(len(W)):
+#	if i>0:
+#		W1 = W[:i+1]
+#		TMRG = TMR_G(W1,E,VB,h0,z1,z2)
+#		GFM[i,:] = TMRG[0]
+#		GFm[i,:] = TMRG[1]
+#		GAMm[i,:] = TMRG[2]
+#		TMR[i,:] = TMRG[3]
+#	else:
+#		W1 = W[0]
+#		TMRG = TMR_G(W1,E,VB,h0,z1,z2)
+#		GFM[0,:] = TMRG[0]
+#		GFm[0,:] = TMRG[1]
+#		GAMm[0,:] = TMRG[2]
+#		TMR[0,:] = TMRG[3]
+
+TMR = np.zeros((len(Narray)+1,len(d)))
+for i in range(len(Narray)):
+#	if i>0:
+	W1 = solve(Narray[i],Karray[i]+1)
+	TMRG = TMR_G(W1,E,VB,h0,z1,z2)
+	TMR[i,:] = TMRG[3]
+
+# Planar case
+W1 = np.arange(0,1,0.01)
+TMRG = TMR_G(W1,E,VB,h0,z1,z2)
+TMR[-1,:] = TMRG[3]
+
+#W1 = W[:5]
+#TMRG = TMR_G(W1,E,VB,h0,z1,z2)
+#GFM = TMRG[0]
+#GFm = TMRG[1]
+#GAMm = TMRG[2]
+#TMR = TMRG[3]
+
+#temptmrg = TMR_G(W)
+#temptmr = temptmrg[3]
+
+d*=1e9
+
+#gfM1, = plt.plot(d,GFM1/GFm1)
+#gfm1, = plt.plot(d,GFm1/GFm1)
+#gaMm1, = plt.plot(d,GAMm1/GFm1)
+
+#gfM, = plt.plot(d,GFM/GFm)
+#gfm, = plt.plot(d,GFm/GFm)
+#gaMm, = plt.plot(d,GAMm/GFm)
+#plt.legend([gfM, gfm, gaMm],["$G_{F}^{\downarrow}$", "$G_{F}^{\uparrow}$", "$0.5G_{A}$"],loc=1)
+#plt.legend([gfM1, gfm1, gaMm1, gfM, gfm, gaMm],["$G_{F}^{\downarrow}$ wire", "$G_{F}^{\uparrow}$ wire", "$0.5G_{A}$ wire", "$G_{F}^{\downarrow}$", "$G_{F}^{\uparrow}$", "$0.5G_{A}$"],loc=1)
+
+
+
+
+
+#pltmr0, = plt.plot(d,TMR[0,:])
+#pltmr1, = plt.plot(d,GAMm[1,:])
+#pltmr2, = plt.plot(d,GAMm[2,:])
+#pltmr3, = plt.plot(d,GAMm[3,:])
+#pltmr4, = plt.plot(d,GAMm[4,:])
+#pltmr5, = plt.plot(d,GAMm[5,:])
+#pltmr6, = plt.plot(d,GAMm[6,:])
+#pltmr7, = plt.plot(d,GAMm[7,:])
+#pltmr8, = plt.plot(d,GAMm[8,:])
+#pltmr9, = plt.plot(d,GAMm[9,:])
+#pltmr10, = plt.plot(d,GAMm[10,:])
+
+#plt.legend([pltmr0, pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr6, pltmr7, pltmr8, pltmr9, pltmr10],["pltmr0", "pltmr1", "pltmr2", "pltmr3", "pltmr4", "pltmr5", "pltmr6", "pltmr7", "pltmr8", "pltmr9", "pltmr10"],loc=1)
+#plt.legend([pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr6, pltmr7, pltmr8, pltmr9, pltmr10],["L1 & L2", "L1 & L2", "L3", "L4 & L5", "L4 & L5", "L6 & L7", "L6 & L7", "L8 & L9", "L8 & L9", "L10"],loc=1)
+
+pltmr0, = plt.plot(d,TMR[0,:])
+pltmr1, = plt.plot(d,TMR[1,:])
+pltmr2, = plt.plot(d,TMR[2,:])
+pltmr3, = plt.plot(d,TMR[3,:])
+pltmr4, = plt.plot(d,TMR[4,:])
+pltmr5, = plt.plot(d,TMR[5,:])
+#pltmr6, = plt.plot(d,TMR[6,:])
+#pltmr7, = plt.plot(d,TMR[7,:])
+#pltmr8, = plt.plot(d,TMR[8,:])
+#pltmr9, = plt.plot(d,TMR[9,:])
+#pltmr10, = plt.plot(d,TMR[10,:])
+pltmr11, = plt.plot(d,TMR[6,:],'.')
+
+#plt.legend([pltmr0, pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr6, pltmr7, pltmr8, pltmr9, pltmr10, pltmr11],["5.3nm", "6.7nm", "7.4nm", "8.5nm", "9.6nm", "10.0nm", "10.6nm", "11.8nm", "12.0nm", "12.7nm", "13.4nm", "planar"],loc=1)
+plt.legend([pltmr0, pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr11],["5.3nm", "6.7nm", "7.4nm", "8.5nm", "9.7nm", "10.0nm", "planar"],loc=1)
+#plt.legend([pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr6, pltmr7, pltmr8, pltmr9, pltmr10],["L1 & L2", "L1 & L2", "L3", "L4 & L5", "L4 & L5", "L6 & L7", "L6 & L7", "L8 & L9", "L8 & L9", "L10"],loc=1)
+
+
+#plt.yscale('log')
+#plt.plot(d,temptmr)
+#plt.plot(d,TMR.T)
+#plt.plot(d,Cplt)
+#plt.plot(d,GAMm)
+#plt.title('TMR ratio vs Spacer layer thickness for different wire dimensions')
+#plt.title('Tunneling conductance ($G_A$) vs $d$ for different wire dimensions')
+#plt.title('Tunneling conductance (A-alignment) vs Spacer layer thickness\n for different levels ($V_{B}=2V$)')
+#plt.title('Tunneling conductance (planar) vs Spacer layer thickness ($V_{B}=2V$)')
+plt.ylabel("TMR ratio (percentage)")
+#plt.ylabel("Conductance per unit area")
+plt.xlabel("Thickness,d (in $nm$)")
+plt.show()
+

@@ -1,0 +1,60 @@
+#############################################################################################################
+#																											#
+#	Title			:	Functions to calculate wave vectors, transformation matrices at FM-barrier interfac-#
+#						es and for eigen value solver														#
+#	Author			:	Alfred Ajay Aureate R																#
+#	Roll No			:	EE10B052																			#
+#	Project guide	:	Prof. Anil Prabhakar, Dept.of Electrical Engineering, IITM							#
+#	Code location	:	/DDP_codes/tmr/vs_vb/defs.py														#
+#	Figure ref.		:	NA																					#
+#	Date			:	19th May, 2015																		#
+#																											#
+#############################################################################################################
+
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import scipy
+import cmath as c
+from scipy.sparse.linalg import lobpcg
+from scipy import sparse
+from pyamg import smoothed_aggregation_solver
+from pyamg.gallery import poisson
+
+CONST = 1.756e+18
+
+def k(E,V,k2):
+	return np.sqrt(CONST*(E-V)-k2)
+
+def add(k,K):
+	return (k+K*1j)
+
+def R(k,K,z,sgn):
+	R = np.zeros((2,2,len(k)))*1j
+	R[0,0,:] = add(k,-K)*np.exp(sgn*z*add(K,-k))
+	R[0,1,:] = sgn*add(k,K)*np.exp(z*add(-K,-k))
+	R[1,0,:] = sgn*add(k,K)*np.exp(z*add(K,k))
+	R[1,1,:] = add(k,-K)*np.exp(z*sgn*add(-K,k))
+	return R
+
+def solve(N,K):
+	A = poisson((N,N), format='csr')
+
+	# create the AMG hierarchy
+	ml = smoothed_aggregation_solver(A)
+
+	# initial approximation to the K eigenvectors
+	X = scipy.rand(A.shape[0], K) 
+
+	# preconditioner based on ml
+	M = ml.aspreconditioner()
+
+	# compute eigenvalues and eigenvectors with LOBPCG
+	W,V = lobpcg(A, X, M=M, tol=1e-8, largest=False)
+	W*=57
+	return W
+

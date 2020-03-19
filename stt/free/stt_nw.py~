@@ -1,0 +1,30 @@
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import cmath as c
+import defs as d
+import plots as p
+
+l = 0		# azimuthal (angular) quantum number
+nwpl = 0	# "0" means 'planar' or "1" means 'nanowire'
+
+if(nwpl==0):
+	q = np.arange(0.001,1,0.001)+0j							# Eigen energies considered for analysis (planar)
+else:
+	q = (sp.jn_zeros(l,11)[:-1]/sp.jn_zeros(l,11)[-1])+0j	# Eigen energies considered for analysis (nanowire)
+
+# Returns [Ru,Rd,Tu,Td,RU,RD,TU,TD,Rud,Tud]
+rsts = d.RsTs(q)											# Reflection and transmission related parameters
+
+p.plotR(q,rsts[4],rsts[5],rsts[8],nwpl)						# Plots spin filtering - reflection probability and current (Fig 4.1.a) and b))
+#p.plotT(q,rsts[6],rsts[7],rsts[9],nwpl)					# Plots spin filtering - transmission probability and current (Fig 4.1.c) and d))
+#p.plotTra(q,rsts[8],rsts[9])								# Plots spin filtering - transverse spin current (Fig 4.1.e) and f))
+#p.plotSR(q,rsts[0],rsts[1],nwpl)							# Plots spin rotation (Fig 4.2)
+#p.plotSP(q,rsts[2],rsts[3])								# Plots spatial spin precession (Fig 4.3)
+
+plt.xlabel('$q$')
+plt.show()

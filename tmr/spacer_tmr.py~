@@ -1,0 +1,283 @@
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import scipy
+import cmath as c
+from scipy.sparse.linalg import lobpcg
+from scipy import sparse
+from pyamg import smoothed_aggregation_solver
+from pyamg.gallery import poisson
+
+CONST = 1.756e+18
+#CONST = (1.756e+18)/0.067
+
+N = 100
+K = 25
+#pot = 10.0/57
+#E = 3.2281
+E = 0.8+0j
+VL = 0.2+0j
+VR = 0.2+0j
+VB = 2.2+0j
+h0 = 0.2+0j
+z1 = 50e-9	# left layer is 50nm long
+#d = 2e-9	# spacer layer is 2nm long
+d = np.arange(0.01,10.0,0.01)*1e-9
+z2 = z1 + d	
+
+def k(E,V,k2):
+	return np.sqrt(CONST*(E-V)-k2)
+
+def add(k,K):
+	return (k+K*1j)
+
+def R(k,K,z,sgn):
+	R = np.zeros((2,2,len(k)))*1j
+	R[0,0,:] = add(k,-K)*np.exp(sgn*z*add(K,-k))
+	R[0,1,:] = sgn*add(k,K)*np.exp(z*add(-K,-k))
+	R[1,0,:] = sgn*add(k,K)*np.exp(z*add(K,k))
+	R[1,1,:] = add(k,-K)*np.exp(z*sgn*add(-K,k))
+	return R
+
+A = poisson((N,N), format='csr')
+
+# create the AMG hierarchy
+ml = smoothed_aggregation_solver(A)
+
+# initial approximation to the K eigenvectors
+X = scipy.rand(A.shape[0], K) 
+
+# preconditioner based on ml
+M = ml.aspreconditioner()
+
+# compute eigenvalues and eigenvectors with LOBPCG
+W,V = lobpcg(A, X, M=M, tol=1e-8, largest=False)
+W*=57
+print W
+#W = np.arange(0,1,0.01)
+k2pp = CONST*W
+#print W
+kL = (k(E,VL,k2pp)).real+1		# wave vector in left non-magnetic layer
+kB = (k(-E,-VB,-k2pp)).real+1	# wave vector in barrier spacer layer
+kR = (k(E,VR,k2pp)).real+1		# wave vector in right non-magnetic layer
+kM = (k(E,-h0,k2pp)).real+1		# wave vector for majority spin channel
+km = (k(E,h0,k2pp)).real+1		# wave vector for minority spin channel
+
+print "kB is ",kB
+print "kM is ",kM
+print "km is ",km
+
+GFM1 = d*0
+GFm1 = d*0
+GAMm1 = d*0
+TMR = d*0
+Tplt = np.zeros((len(d),len(kM)))
+Cplt = d*0
+
+dk2 = np.roll(k2pp,-1) - k2pp
+dk2[-1] = 1.0*CONST-k2pp[-1]	#added late
+#print dk2
+#dk2 = 1
+
+for i in range(len(d)):
+	R1 = R(kL,kB,z1,1)/(2*kL)
+	R2 = R(kR,kB,z2[i],-1)*1j/(2*kB)
+
+	R1M = R(kM,kB,z1,1)/(2*kM)
+	R2M = R(kM,kB,z2[i],-1)*1j/(2*kB)
+
+	R1m = R(km,kB,z1,1)/(2*km)
+	R2m = R(km,kB,z2[i],-1)*1j/(2*kB)
+
+	T = (kR/kL)/((abs(R1[0,0,:]*R2[0,0,:]+R1[0,1,:]*R2[1,0,:]))**2)	# transmission probability
+	TMM = (kM/kM)/((abs(R1M[0,0,:]*R2M[0,0,:]+R1M[0,1,:]*R2M[1,0,:]))**2)	# transmission probability
+	Tmm = (km/km)/((abs(R1m[0,0,:]*R2m[0,0,:]+R1m[0,1,:]*R2m[1,0,:]))**2)	# transmission probability
+	TMm = (km/kM)/((abs(R1M[0,0,:]*R2m[0,0,:]+R1M[0,1,:]*R2m[1,0,:]))**2)	# transmission probability
+
+	G = np.cumsum((1.962635e-6)*dk2*np.roll(T,1))[-2]	# total conductance
+
+	Tplt[i,:] = dk2/np.roll((abs(R1M[0,0,:]*R2M[0,0,:]+R1M[0,1,:]*R2M[1,0,:]))**2,1)
+	Cplt[i] = 1.962635e-6*np.cumsum(Tplt[i,:])[-2]
+
+	GFM1[i] = np.cumsum((1.962635e-6)*dk2*np.roll(TMM,1))[-2]	# conductance for ferromagnetic spin majority channel
+	GFm1[i] = np.cumsum((1.962635e-6)*dk2*np.roll(Tmm,1))[-2]	# conductance for ferromagnetic spin minority channel
+	GAMm1[i] = np.cumsum((1.962635e-6)*dk2*np.roll(TMm,1))[-2]	# conductance for anti-ferromagnetic channel
+
+	GF = GFM1 + GFm1
+	GA = 2*GAMm1
+
+	TMR[i] = (GF[i]-GA[i])*100/GA[i]
+
+
+#d*=1e9
+#plt.legend([gfM1, gfm1, gaMm1],["$G_{F}^{\downarrow}$", "$G_{F}^{\uparrow}$", "$0.5G_{A}$"],loc=1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+#W = np.arange(0.01,1.0,0.01)+0j
+k2pp = CONST*W
+#print W
+kL = (k(E,VL,k2pp))#.real+1		# wave vector in left non-magnetic layer
+kB = (k(-E,-VB,-k2pp))#.real+1	# wave vector in barrier spacer layer
+kR = (k(E,VR,k2pp))#.real+1		# wave vector in right non-magnetic layer
+kM = (k(E,-h0,k2pp))#.real+1		# wave vector for majority spin channel
+km = (k(E,h0,k2pp)).real+1		# wave vector for minority spin channel
+
+print "kB is ",kB
+print "kM is ",kM
+print "km is ",km
+
+kM0 = k(E,-h0,0)
+km0 = k(E,h0,0)
+kB0 = k(-E,-VB,0)
+
+GFM = d*0
+GFm = d*0
+GAMm = d*0
+TMR = d*0
+#Tplt = np.zeros((len(d),len(kM)))
+TpltM = np.zeros((len(d),len(kM)))
+Tpltm = np.zeros((len(d),len(kM)))
+TpltMm = np.zeros((len(d),len(kM)))
+
+Cplt = d*0
+dk2 = np.roll(k2pp,-1) - k2pp
+dk2[-1] = 1.0*CONST-k2pp[-1]
+#dk2 = 1
+print "dk2 is ",dk2
+
+for i in range(len(d)):
+	R1 = R(kL,kB,z1,1)/(2*kL)
+	R2 = R(kR,kB,z2[i],-1)*1j/(2*kB)
+
+	R1M = R(kM,kB,z1,1)/(2*kM)
+	R2M = R(kM,kB,z2[i],-1)*1j/(2*kB)
+
+	R1m = R(km,kB,z1,1)/(2*km)
+	R2m = R(km,kB,z2[i],-1)*1j/(2*kB)
+
+	T = (kR/kL)/((abs(R1[0,0,:]*R2[0,0,:]+R1[0,1,:]*R2[1,0,:]))**2)	# transmission probability
+	TMM = (kM/kM)/((abs(R1M[0,0,:]*R2M[0,0,:]+R1M[0,1,:]*R2M[1,0,:]))**2)	# transmission probability
+	Tmm = (km/km)/((abs(R1m[0,0,:]*R2m[0,0,:]+R1m[0,1,:]*R2m[1,0,:]))**2)	# transmission probability
+	TMm = (km/kM)/((abs(R1M[0,0,:]*R2m[0,0,:]+R1M[0,1,:]*R2m[1,0,:]))**2)	# transmission probability
+	tmm1 = abs(R1m[0,0,:]*R2m[0,0,:])
+
+#	print "kM is ",kM
+#	print "km is ",km
+
+	G = np.cumsum((1.962635e-6)*dk2*np.roll(T,1))[-2]	# total conductance
+
+#	Tplt[i,:] = dk2/np.roll((abs(R1M[0,0,:]*R2M[0,0,:]+R1M[0,1,:]*R2M[1,0,:]))**2,1)
+#	Cplt[i] = 1.962635e-6*np.cumsum(Tplt[i,:])[-2]
+	Tplt[i,:] = TMm
+#	Tplt[i,:] = (1.962635e-6)*np.roll(TMm,1)
+#	Tplt[i,:] = (1.962635e-6)*np.roll(mm,0)
+	TpltM[i,:] = TMM
+	Tpltm[i,:] = Tmm
+	TpltMm[i,:] = TMm
+	
+#	print "TMM is ",TMM
+
+#	print "R1M[0,0,:] is ",R1M[0,0,:]
+#	print "R2M[0,0,;] is ",R2M[0,0,:]
+#	print "R1M[0,1,:] is ",R1M[0,1,:]
+#	print "R2M[1,0,:] is ",R2M[1,0,:]
+#	print "R1m[0,0,:] is ",R1m[0,0,:]
+#	print "R2m[0,0,:] is ",R2m[0,0,:]
+#	print "R1m[0,1,:] is ",R1m[0,1,:]
+#	print "R2m[1,0,:] is ",R2m[1,0,:]
+
+#	print dk2,(1-k2pp[-1])
+#	GFM[i] = np.cumsum((1.962635e-6)*dk2*np.roll(TMM,1))[-2]	# conductance for ferromagnetic spin majority channel##
+#	GFm[i] = np.cumsum((1.962635e-6)*dk2*np.roll(Tmm,1))[-2]	# conductance for ferromagnetic spin minority channel
+#	GAMm[i] = np.cumsum((1.962635e-6)*dk2*np.roll(TMm,1))[-2]	# conductance for anti-ferromagnetic channel
+
+	GFM[i] = np.cumsum((1.962635e-6)*dk2*TMM)[-1]	# conductance for ferromagnetic spin majority channel##
+	GFm[i] = np.cumsum((1.962635e-6)*dk2*Tmm)[-1]	# conductance for ferromagnetic spin minority channel
+	GAMm[i] = np.cumsum((1.962635e-6)*dk2*TMm)[-1]	# conductance for anti-ferromagnetic channel
+
+	GF = GFM + GFm
+	GA = 2*GAMm
+
+	TMR[i] = (GF[i]-GA[i])*100/GA[i]
+
+#	GFM[i] = kM0*kM0/(kM0*kM0+kB0*kB0)**2
+#	GFm[i] = km0*km0/(km0*km0+kB0*kB0)**2
+#	GAMm[i] = kM0*km0/((km0*km0+kB0*kB0)*(kM0*kM0+kB0*kB0))
+
+
+d*=1e9
+
+
+#gfM1, = plt.plot(d,GFM1)
+#gfm1, = plt.plot(d,GFm1)
+#gaMm1, = plt.plot(d,GAMm1)
+
+#gfM, = plt.plot(d,GFM/GFm)
+#gfm, = plt.plot(d,GFm/GFm)
+#gaMm, = plt.plot(d,GAMm/GFm)
+#plt.legend([gfM, gfm, gaMm],["$G_{F}^{\downarrow}$", "$G_{F}^{\uparrow}$", "$0.5G_{A}$"],loc=1, fontsize=20)
+#plt.legend([gfM1, gfm1, gaMm1, gfM, gfm, gaMm],["$G_{F}^{\downarrow}$ (nanowire)", "$G_{F}^{\uparrow}$ (nanowire)", "$0.5G_{A}$ (nanowire)", "$G_{F}^{\downarrow}$ (planar)", "$G_{F}^{\uparrow}$ (planar)", "$0.5G_{A}$ (planar)"],loc=1, fontsize=15)
+
+#plt.plot(d,(GFM+GFm-2*GAMm)/GFm)
+
+pltmr0, = plt.plot(d,Tplt[:,0])
+#pltmr1, = plt.plot(d,Tplt[:,1])
+pltmr2, = plt.plot(d,Tplt[:,2])
+pltmr3, = plt.plot(d,Tplt[:,3])
+#pltmr4, = plt.plot(d,Tplt[:,4])
+pltmr5, = plt.plot(d,Tplt[:,5])
+#pltmr6, = plt.plot(d,Tplt[:,6])
+pltmr7, = plt.plot(d,Tplt[:,7])
+#pltmr8, = plt.plot(d,Tplt[:,8])
+pltmr9, = plt.plot(d,Tplt[:,9])
+pltmr10, = plt.plot(d,Tplt[:,10])
+
+#plt.legend([pltmr0, pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr6, pltmr7, pltmr8, pltmr9],["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9"],loc=1)
+#plt.legend([pltmr0, pltmr1, pltmr3, pltmr4, pltmr6, pltmr8, pltmr10],["L0", "L1", "L2 &L3", "L4", "L5 & L6", "L7 & L8", "L9 & L10"],loc=1)
+plt.legend([pltmr0, pltmr2, pltmr3, pltmr5, pltmr7, pltmr9, pltmr10],["L0", "L1 &L2", "L3", "L4 & L5", "L6 & L7", "L8 & L9", "L10"],loc=1)
+
+
+#num = 3
+#pltmr0, = plt.plot(d,abs(TpltM[:,num]/Tpltm[:,num]))
+#pltmr1, = plt.plot(d,abs(Tpltm[:,num]/Tpltm[:,num]))
+#pltmr2, = plt.plot(d,abs(TpltMm[:,num]/Tpltm[:,num]))
+#plt.legend([pltmr0, pltmr1, pltmr2],["M", "m", "Mm"],loc=1)
+
+#print "kB is ",kB
+
+
+
+#print "lambda for down",(2*np.pi/kM)
+#print "lambda for up",(2*np.pi/km)
+#print "lambda for barrier",(2*np.pi/kB)
+
+plt.yscale('log')
+#plt.plot(d,TMR)
+#plt.plot(d,Tplt[:,:-1])
+#plt.plot(d,GAMm)
+#plt.title('Tunneling magnetoresistance (TMR) ratio vs Spacer layer thickness')
+#title = "Relative tunneling conductance (nanowire) vs Spacer layer thickness ($V_{B}=2.2V$)"
+#plt.text(0, 1.21,title)
+#plt.title('Tunneling conductance vs Spacer layer thickness ($V_{B}=2.2V$)')
+#plt.title('$T_F^\downarrow(k_{\Vert})$ (nanowire) vs Spacer layer thickness (d) ($V_{B}=2.2V$)')
+#plt.ylabel("TMR ratio (percentage)")
+#plt.ylabel("Relative tunneling conductance", fontsize=20)
+plt.ylabel("Transmission probability $T_A(k_{\Vert})$", fontsize=20)
+plt.xlabel("Thickness, d (in $nm$)", fontsize=15)
+plt.show()
+

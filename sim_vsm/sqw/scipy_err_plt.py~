@@ -1,0 +1,119 @@
+from scipy.integrate import odeint
+from scipy.special import gamma, airy
+from numpy import *
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+
+error = 1 # 0 stands for max error and 1 stands for mean error
+blocks = 400
+
+y0_0 = 0
+y1_0 = 1
+y0 = [y0_0, y1_0]
+
+def k0gen(n_x):
+	return (-n_x*nx*pi*pi/4)
+
+y0_1 = 0
+y1_1 = 1
+y1 = [y0_1, y1_1]
+
+def k1gen(n_y):
+	return (-n_y*ny*pi*pi/4)
+
+def func0(y, t):
+	return [k0gen(nx)*y[1],y[0]]
+
+def func1(y, t):
+	return [k1gen(ny)*y[1],y[0]]
+
+def Z_err(del_size):
+	x = arange(0, 4.0, del_size)
+	size = len(x)
+	t = x
+	X = x
+	Y = x
+	X1, Y1 = meshgrid(X[:(size/2)], Y[:(size/2)])
+	X, Y = meshgrid(X[:(size/2)], Y[:(size/2)])
+	Z1 = X*Y*0
+	Z2 = X*Y*0
+
+	Z_act = ((sqrt(2/2))*(sin(pi*ny*X1/2)))*((sqrt(2/2))*(sin(pi*nx*Y1/2)))	#phi(X)*phi(Y)
+
+	y_0 = odeint(func0, y0, t)
+	y_1 = odeint(func1, y1, t)
+	rows = len(y_0[:(size/2),1])
+	cols = len(y_1[:(size/2),1])
+
+	for i in range(rows):
+		for j in range(cols):
+			if (i!=0)&(i<rows-1)&(j!=0)&(j<cols-1):
+				Z1[i][j] = y_0[(i+(size/4)/nx),1]*y_1[(j+(size/4)/ny),1]
+				Z2[i][j] = y_0[(i+((size/4)+1)/nx),1]*y_1[(j+((size/4)+1)/ny),1]
+
+	Z = (Z1+Z2)/2
+	Z_err = Z*0
+	for i in range(rows):
+		for j in range(cols):
+			Z_err[i][j] = (Z[i][j]-Z_act[i][j])*100 # matrix containing error percentage
+
+	for i in range(rows):
+		for j in range(1):
+			Z_err[i][cols-j-1] = 0
+
+	for i in range(1):
+		for j in range(cols):
+			Z_err[rows-i-1][j] = 0
+
+	max_err = 0
+	mean_err = 0
+	for i in range(rows):
+		for j in range(cols):
+			mean_err = mean_err + abs(Z_err[i][j])
+			if max_err < abs(Z_err[i][j]):
+				max_err = abs(Z_err[i][j])
+	mean_err = mean_err/(rows*cols)
+	return [max_err, mean_err]
+
+l = 2
+Err = [[],[],[]]
+while(l<=blocks):
+	nx=1
+	ny=1
+	Err_temp = Z_err(4.0/l)
+	if(error==0):
+		Err[0].append(Err_temp[0])
+	else:
+		Err[0].append(Err_temp[1])
+	nx=1
+	ny=2
+	Err_temp = Z_err(4.0/l)
+	if(error==0):
+		Err[1].append(Err_temp[0])
+	else:
+		Err[1].append(Err_temp[1])
+	nx=2
+	ny=2
+	Err_temp = Z_err(4.0/l)
+	if(error==0):
+		Err[2].append(Err_temp[0])
+	else:
+		Err[2].append(Err_temp[1])
+	l+=1
+
+X_axis = arange(1,blocks,1)
+fig, axes = plt.subplots(nrows=1, ncols=1)
+axes.plot(X_axis,Err[0], label="nx=1; ny=1")
+axes.plot(X_axis,Err[1], label="nx=1; ny=2")
+axes.plot(X_axis,Err[2], label="nx=2; ny=2")
+axes.legend(loc=1)
+#if (error==0):
+#	axes.set_title('"Maximum error" percentage as the number of blocks are increased')
+#else:
+#	axes.set_title('"Mean error" percentage as the number of blocks are increased')
+axes.set_xlabel('Number of blocks')
+axes.set_ylabel('Error percentage')
+fig.tight_layout()
+plt.show()

@@ -1,0 +1,32 @@
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import scipy
+import cmath as c
+from scipy.sparse.linalg import lobpcg
+from scipy import sparse
+from pyamg import smoothed_aggregation_solver
+from pyamg.gallery import poisson
+
+def plotTraProb(d,Tplt,traprob):
+	pltmr0, = plt.plot(d,Tplt[:,0])
+	pltmr1, = plt.plot(d,Tplt[:,2])
+	pltmr2, = plt.plot(d,Tplt[:,3])
+	pltmr3, = plt.plot(d,Tplt[:,5])
+	pltmr4, = plt.plot(d,Tplt[:,7])
+	pltmr5, = plt.plot(d,Tplt[:,9])
+	pltmr6, = plt.plot(d,Tplt[:,10])
+
+	plt.legend([pltmr0, pltmr1, pltmr2, pltmr3, pltmr4, pltmr5, pltmr6],["L0", "L1 &L2", "L3", "L4 & L5", "L6 & L7", "L8 & L9", "L10"],loc=1)
+	plt.yscale('log')
+	if(traprob==0):
+		plt.ylabel("Transmission probability $T_F^{\downarrow}(k_{\Vert})$", fontsize=20)
+	elif(traprob==1):
+		plt.ylabel("Transmission probability $T_F^{\uparrow}(k_{\Vert})$", fontsize=20)
+	elif(traprob==2):
+		plt.ylabel("Transmission probability $T_A(k_{\Vert})$", fontsize=20)
+

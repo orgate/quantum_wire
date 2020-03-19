@@ -1,0 +1,174 @@
+#########################################################################################
+#																						#
+#	Title			:	Transverse spin current while considering free electrons		#
+#	Author			:	Alfred Ajay Aureate R											#
+#	Roll No			:	EE10B052														#
+#	Project			:	Dual Degree Project												#
+#	Guide			:	Prof. Anil Prabhakar, Dept. of Electrical Engineering, IITM		#
+#	Date			:	18th May, 2015													#
+#	ID				:																	#
+#																						#
+#########################################################################################
+
+
+#########################################################################################
+# Importing necessary libraries															#
+#########################################################################################
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import cmath as c
+
+
+#########################################################################################
+# Setting eigen modes																	#
+#########################################################################################
+l = 0	# azimuthal (angular) quantum number
+m = 1	# radial quantum number
+kmp = (sp.jn_zeros(l,11)[:-1]/sp.jn_zeros(l,11)[-1])+0j		# Eigen wavemodes considered
+#kmp = np.arange(0,1,0.001)+0j
+kz = np.sqrt(1-kmp*kmp)
+kzu = np.sqrt(1.5*1.5-kmp*kmp)
+kzd = np.sqrt(0.5*0.5-kmp*kmp)
+#a = np.arange(1,11,1)/10
+a = kmp
+x = np.arange(0,101,1)
+x, y = np.meshgrid(x, a)
+theta = 8*np.pi/4
+
+Tu = 2*kz/(kz+kzu)
+Td = 2*kz/(kz+kzd)
+Ru = (kz-kzu)/(kz+kzu)
+Rd = (kz-kzd)/(kz+kzd)
+
+RU = abs(Ru)**2
+RD = abs(Rd)**2
+TU = kzu.real*(abs(Tu)**2)/kz
+TD = kzd.real*(abs(Td)**2)/kz
+Rud = abs(Ru*Rd.conjugate())
+Tud = (Tu*Td*((kzd+kzu)/(2*kz))*np.exp((kzd*100-kzu*100)*1j))
+alf = (np.exp((kzd*1)*1j))
+#Qzx = ( TU*(np.cos(theta/2))*(np.cos(theta/2)) - TD*(np.sin(theta/2))*(np.sin(theta/2)) )
+Qzx = ( (abs(Tu)**2)*(np.cos(theta/2))*(np.cos(theta/2))*kzu/kz - (abs(Td)**2)*(np.sin(theta/2))*(np.sin(theta/2))*kzd/kz ).real
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+kmp1 = np.arange(0,1,0.001)+0j
+kz1 = np.sqrt(1-kmp1*kmp1)
+kzu1 = np.sqrt(1.5*1.5-kmp1*kmp1)
+kzd1 = np.sqrt(0.5*0.5-kmp1*kmp1)
+#a = np.arange(1,11,1)/10
+#a = kmp
+#x = np.arange(0,101,1)
+#x, y = np.meshgrid(x, a)
+#theta = 8*np.pi/4
+
+Tu1 = 2*kz1/(kz1+kzu1)
+Td1 = 2*kz1/(kz1+kzd1)
+Ru1 = (kz1-kzu1)/(kz1+kzu1)
+Rd1 = (kz1-kzd1)/(kz1+kzd1)
+
+RU1 = abs(Ru1)**2
+RD1 = abs(Rd1)**2
+TU1 = kzu1.real*(abs(Tu1)**2)/kz1
+TD1 = kzd1.real*(abs(Td1)**2)/kz1
+
+
+
+
+
+
+
+
+
+
+
+
+
+#print (Tu*Td*((kzd+kzu)/(2*kz))*np.exp((kzd*1-kzu*1)*1j))
+
+T_spin = abs(Rud) + abs(Tud)
+Spin_Rot = (np.log(Ru*Rd)).imag
+#Phase = abs((np.outer(kzd,x)-np.outer(kzu,x)))
+#print len((kzd*x.T)[0])
+#print len((np.vdot(kzd,x.T))[0]),len(np.exp((np.vdot(kzd,x.T)-np.vdot(kzu,x.T))*1j)[0])
+#Phase = abs(np.outer(((kzd+kzu)/(2*kz)),np.exp((np.outer(kzd,x)-np.outer(kzu,x))*1j)))
+Phase = (np.log((Tu*Td*((kzd+kzu)/(2*kz)))*(np.exp((kzd*x.T-kzu*x.T)*1j)))).imag
+#Phase%=(2*np.pi)
+#print x,y,len(Phase),len(Phase[0]),Phase.max(),Phase.min(),Phase
+#print kmp,kz
+#plt.plot(kmp,RU,'+')
+#plt.plot(kmp,RD,'.')
+#plt.plot(kmp,Rud,'o')
+
+#p1, = plt.plot([1,2,3])
+#p2, = plt.plot([3,2,1])
+#p3, = plt.plot([2,3,1])
+#plt.legend([p2, p1], ["line 2", "line 1"])
+
+
+#R_up, = plt.plot(kmp,RU,'.')
+#R_down, = plt.plot(kmp,RD,'.')
+#R_up1, = plt.plot(kmp1,RU1)
+#R_down1, = plt.plot(kmp1,RD1)
+#R_ud, = plt.plot(kmp,Rud)
+#plt.legend([R_up, R_down, R_up1, R_down1], ["$R^{\uparrow}$ (nanowire)", "$R^{\downarrow}$ (nanowire)", "$R^{\uparrow}$ (planar)", "$R^{\downarrow}$ (planar)"],loc=2)
+#plt.title('Spin filtering - Reflection probability currents (planar)')
+
+
+#print TU
+T_up, = plt.plot(kmp,TU,'+')
+T_down, = plt.plot(kmp,TD,'.')
+T_ud, = plt.plot(kmp,abs(Tud),'o')
+#plt.plot(kmp,alf.real)
+#plt.plot(kmp,alf.imag)
+plt.legend([T_up, T_down, T_ud], ["$T^{\uparrow}$ (probability)", "$T^{\downarrow}$ (probability)", "$|T_{\uparrow}T_{\downarrow}^{*}\Phi|_{x\longrightarrow100}$ transmitted spin current density"],loc=3)
+plt.title('Spin filtering - Transmission probability currents (nanowire)')
+
+
+#QZX, = plt.plot(kmp,Qzx)
+#plt.legend([QZX], ["$Q_{zx}$"], loc=2)
+#plt.title('Spin Transmission - longitudinal component (nanowire)')
+
+#Tra_spin, = plt.plot(kmp,T_spin,'o')
+#plt.legend([Tra_spin], ["$|R^{\uparrow}R^{\downarrow}|+|T_{\uparrow}T_{\downarrow}^{*}\Phi|_{x\longrightarrow100}$"])
+#plt.title('Spin filtering - Transverse spin current: $|R^{\uparrow}R^{\downarrow}|+|T_{\uparrow}T_{\downarrow}^{*}\Phi|_{x\longrightarrow100}$ (nanowire)')
+
+
+#Spin_R = plt.plot(kmp,Spin_Rot)
+#plt.ylabel('radians')
+#plt.title('Spin rotation: $phase(R_{\uparrow}R_{\downarrow} ) $ (planar)')
+
+
+#plt.plot(x,Phase.T)
+#plt.title('Spatial precession')
+#plt.ylabel('x')
+
+
+#fig, ax = plt.subplots()
+
+#p = ax.pcolor(y, x, Phase.T, cmap=cm.RdBu, vmin=abs(Phase).min(), vmax=abs(Phase).max())
+#cb = fig.colorbar(p, ax=ax)
+#plt.title('Spatial precession $phase(T_{\uparrow}T_{\downarrow}^{*}\Phi)$ (nanowire)')
+#plt.ylabel('x')
+
+
+plt.xlabel('$q$')
+#plt.xlabel('$q\equiv j_{lm}$')
+
+plt.show()

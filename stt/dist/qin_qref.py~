@@ -1,0 +1,61 @@
+#############################################################################################################
+#																											#
+#	Title			:	Incident and reflected transverse spin current density vs wire size in nm			#
+#	Author			:	Alfred Ajay Aureate R																#
+#	Roll No			:	EE10B052																			#
+#	Project guide	:	Prof. Anil Prabhakar, Dept.of Electrical Engineering, IITM							#
+#	Code location	:	/DDP_codes/stt/dist/qin_qref.py														#
+#	Figure ref.		:	Figure 4.4																			#
+#	Date			:	19th May, 2015																		#
+#																											#
+#############################################################################################################
+
+from __future__ import division
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.special as sp
+import scipy
+import cmath as c
+from scipy.sparse.linalg import lobpcg
+from scipy import sparse
+from pyamg import smoothed_aggregation_solver
+from pyamg.gallery import poisson
+import defs as d														# Importing custom library
+
+#############################################################################################################
+# sizes at which EF (Fermi level) = eigen energy level
+#############################################################################################################
+Narray = np.array([53, 67, 74, 85, 97, 100, 106, 118, 120, 127, 134]) 	# wire sizes
+Karray = np.array([2, 3, 5, 7, 9, 10, 12, 14, 16, 18, 19])				# number of modes considered
+x = 10+0j
+
+#############################################################################################################
+# Incident, reflected and transmitted transverse spin currents initalized and calculated					#
+#############################################################################################################
+Qin = np.zeros((1,len(Narray)))
+Qref = np.zeros((1,len(Narray)))
+Qtra = np.zeros((1,len(Narray)))
+for i in range(len(Narray)):
+	q = np.sqrt(d.solve(Narray[i],Karray[i]+1)+0j)
+	dq = np.roll(q,-1) - q
+	dq[-1] = 1-q[-1]
+	rsts = d.RsTs(q)
+
+	Qin[:,i] = np.cumsum(q*dq)[-1]
+	Qref[:,i] = np.cumsum(q*dq*abs(rsts[3].conjugate()*rsts[4]))[-1]/Qin[:,i]
+	Qtra[:,i] = np.cumsum(q*dq*abs((rsts[1]+rsts[2])*rsts[5].conjugate()*rsts[6]/(2*rsts[0])*np.exp(-1j*(rsts[1]-rsts[2])*x)))[-1]/Qin[:,i]
+
+#############################################################################################################
+# Plotting of the incident and reflected transverse spin currents											#
+#############################################################################################################
+qin, = plt.plot(Narray/10,Qin.T)
+qref, = plt.plot(Narray/10,Qref.T)
+plt.legend([qin, qref],['$Q_{in}$', '$Q_{ref}/Q_{in}$'],loc=4)
+
+plt.ylabel('$Q_{tra}$')
+plt.xlabel('Wire size (in $nm$))')
+
+plt.show()
